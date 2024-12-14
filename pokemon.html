@@ -37,39 +37,57 @@
       margin-top: 20px;
     }
     .navbar {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    width: 100% !important;
+      position: fixed !important;
+      top: 0 !important;
+      left: 0 !important;
+      width: 100% !important;
+    }
+    #loading {
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 24px;
+      font-weight: bold;
+      color: #007bff;
+      padding: 20px;
+      background-color: rgba(255, 255, 255, 0.8);
+      border-radius: 10px;
+      box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+      display: none; /* 預設隱藏 */
     }
   </style>
 </head>
 <body>
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
-        <a class="navbar-brand" href="index.html">API Overview</a>
-        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-          <span class="navbar-toggler-icon"></span>
-        </button>
-        <div class="collapse navbar-collapse" id="navbarNav">
-          <ul class="navbar-nav">
-            <li class="nav-item">
-              <a class="nav-link" href="stock.html">股票資訊</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="air.html">空氣品質</a>
-            </li>
-            <li class="nav-item">
-              <a class="nav-link" href="pokemon.html">寶可夢圖鑑</a>
-            </li>
-          </ul>
-        </div>
-      </nav>
+  <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+    <a class="navbar-brand" href="index.html">API Overview</a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav">
+        <li class="nav-item">
+          <a class="nav-link" href="stock.html">股票資訊</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="air.html">空氣品質</a>
+        </li>
+        <li class="nav-item">
+          <a class="nav-link" href="pokemon.html">寶可夢圖鑑</a>
+        </li>
+      </ul>
+    </div>
+  </nav>
+
   <h1>寶可夢圖鑑</h1>
 
   <div class="search">
     <label for="search-input">搜尋寶可夢名稱或編號：</label>
     <input type="text" id="search-input" placeholder="輸入寶可夢名稱或編號">
   </div>
+
+  <!-- 載入中提示 -->
+  <div id="loading">載入中...</div>
 
   <table id="pokemon-table">
     <thead>
@@ -93,7 +111,7 @@
       fighting: "格鬥", poison: "毒", ground: "地面", flying: "飛行", psychic: "超能力",
       bug: "蟲", rock: "岩石", ghost: "幽靈", dragon: "龍", dark: "惡", steel: "鋼", fairy: "妖精"
     };
-  
+
     const typeEffectiveness = {
       "一般": { 克制: [], 被剋: ["格鬥"], 無效: ["幽靈"] },
       "火": { 克制: ["草", "冰", "蟲", "鋼"], 被剋: ["水", "地面", "岩石"], 無效: [] },
@@ -114,86 +132,83 @@
       "鋼": { 克制: ["岩石", "冰", "妖精"], 被剋: ["火", "格鬥", "地面"], 無效: ["毒"] },
       "妖精": { 克制: ["格鬥", "龍", "惡"], 被剋: ["毒", "鋼"], 無效: ["龍"] }
     };
-  
+
     let allPokemon = [];
-  
-    // Fetch data
+
+    // 初始化網頁時載入資料並顯示載入中
+    window.addEventListener('DOMContentLoaded', async () => {
+      const tableBody = document.querySelector('#pokemon-table tbody');
+      tableBody.innerHTML = '<tr><td colspan="6">載入中...</td></tr>';
+      
+      try {
+        // 實際抓取寶可夢資料
+        await fetchPokemonData();
+      } catch (error) {
+        console.error('載入資料時發生錯誤:', error);
+        tableBody.innerHTML = '<tr><td colspan="6">無法載入資料，請稍後再試。</td></tr>';
+      }
+    });
+
+    // Fetch Pokemon Data
     async function fetchPokemonData() {
       for (let i = 1; i <= 1010; i++) { // 遍歷所有世代
         const pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
         const pokemonData = await pokemonResponse.json();
-        const types = pokemonData.types.map(t => translations[t.type.name] || t.type.name);
-  
-        // Fetch species data to get the generation
-        const speciesResponse = await fetch(pokemonData.species.url);
-        const speciesData = await speciesResponse.json();
-        const generation = speciesData.generation.name;
-  
-        allPokemon.push({
+        const types = pokemonData.types.map(type => translations[type.type.name]);
+        const pokemon = {
           id: pokemonData.id,
           name: pokemonData.name,
-          generation: generation, // 存入世代資訊
-          types: types.join(" / "),
+          generation: Math.floor((pokemonData.id - 1) / 100) + 1,
+          types: types.join(", "),
           克制: calculateEffectiveness(types, "克制"),
           被剋: calculateEffectiveness(types, "被剋")
-        });
+        };
+        allPokemon.push(pokemon);
       }
+
       renderTable(allPokemon);
+      document.getElementById("loading").style.display = "none"; // 隱藏載入中訊息
     }
-  
-    function calculateEffectiveness(types, key) {
-      const result = new Set();
+
+    // Calculate effectiveness based on the types
+    function calculateEffectiveness(types, typeCategory) {
+      const effectiveness = new Set();
       types.forEach(type => {
-        const effectiveness = typeEffectiveness[type] || {};
-        (effectiveness[key] || []).forEach(e => result.add(e));
+        typeEffectiveness[type]?.[typeCategory]?.forEach(eff => effectiveness.add(eff));
       });
-      return Array.from(result).join(" / ");
+      return [...effectiveness].join(" / ");
     }
-  
-    function renderTable(data) {
-      const tableBody = document.querySelector('#pokemon-table tbody');
-      tableBody.innerHTML = data.map(pokemon => `
-        <tr>
+
+    // Render the Pokemon table
+    function renderTable(pokemonList) {
+      const tableBody = document.querySelector("#pokemon-table tbody");
+      tableBody.innerHTML = "";
+      pokemonList.forEach(pokemon => {
+        const row = document.createElement("tr");
+        row.innerHTML = `
           <td>${pokemon.id}</td>
           <td>${pokemon.name}</td>
           <td>${pokemon.generation}</td>
           <td>${pokemon.types}</td>
           <td>${pokemon.克制}</td>
           <td>${pokemon.被剋}</td>
-        </tr>
-      `).join('');
+        `;
+        tableBody.appendChild(row);
+      });
     }
-  
-    // Sorting function
-    function sortTable(column) {
-      const header = document.querySelector(`[data-column="${column}"]`);
-      const order = header.dataset.order === 'asc' ? 'desc' : 'asc';
-      header.dataset.order = order;
-  
-      allPokemon.sort((a, b) => {
-        if (a[column] < b[column]) return order === 'asc' ? -1 : 1;
-        if (a[column] > b[column]) return order === 'asc' ? 1 : -1;
-        return 0;
-      });
-      renderTable(allPokemon);
-      document.querySelectorAll('th').forEach(th => th.classList.remove('asc', 'desc'));
-      header.classList.add(order);
-    }
-  
-    document.addEventListener('DOMContentLoaded', () => {
-      fetchPokemonData();
-      document.querySelectorAll('th[data-column]').forEach(th => {
-        th.addEventListener('click', () => sortTable(th.dataset.column));
-      });
-      document.querySelector('#search-input').addEventListener('input', (e) => {
-        const value = e.target.value.toLowerCase();
-        const filtered = allPokemon.filter(p => 
-          p.name.toLowerCase().includes(value) || String(p.id).includes(value)
-        );
-        renderTable(filtered);
-      });
+
+    // Search functionality
+    document.getElementById("search-input").addEventListener("input", function(event) {
+      const searchText = event.target.value.toLowerCase();
+      const filteredPokemon = allPokemon.filter(pokemon => 
+        pokemon.name.toLowerCase().includes(searchText) ||
+        pokemon.id.toString().includes(searchText)
+      );
+      renderTable(filteredPokemon);
     });
   </script>
-  
+
+  <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.11.6/dist/umd/popper.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.min.js"></script>
 </body>
 </html>
