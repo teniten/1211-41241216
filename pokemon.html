@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>寶可夢圖鑑</title>
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      margin: 20px;
+      padding-top: 50px; /* 確保內容不會被固定的navbar蓋住 */
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin-top: 20px;
+    }
+    table, th, td {
+      border: 1px solid #ddd;
+    }
+    th, td {
+      padding: 8px;
+      text-align: left;
+    }
+    th {
+      background-color: #f4f4f4;
+      cursor: pointer;
+    }
+    .asc::after {
+      content: " ▲";
+    }
+    .desc::after {
+      content: " ▼";
+    }
+    .search {
+      margin-top: 20px;
+    }
+    .navbar {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100% !important;
+    }
+  </style>
+</head>
+<body>
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark fixed-top">
+        <a class="navbar-brand" href="index.html">API Overview</a>
+        <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+          <span class="navbar-toggler-icon"></span>
+        </button>
+        <div class="collapse navbar-collapse" id="navbarNav">
+          <ul class="navbar-nav">
+            <li class="nav-item">
+              <a class="nav-link" href="stock.html">股票資訊</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="air.html">空氣品質</a>
+            </li>
+            <li class="nav-item">
+              <a class="nav-link" href="pokemon.html">寶可夢圖鑑</a>
+            </li>
+          </ul>
+        </div>
+      </nav>
+  <h1>寶可夢圖鑑</h1>
+
+  <div class="search">
+    <label for="search-input">搜尋寶可夢名稱或編號：</label>
+    <input type="text" id="search-input" placeholder="輸入寶可夢名稱或編號">
+  </div>
+
+  <table id="pokemon-table">
+    <thead>
+      <tr>
+        <th data-column="id">編號</th>
+        <th data-column="name">名稱</th>
+        <th data-column="generation">世代</th>
+        <th data-column="types">屬性</th>
+        <th data-column="克制">克制屬性</th>
+        <th data-column="被剋">被剋屬性</th>
+      </tr>
+    </thead>
+    <tbody>
+      <!-- Data will be inserted here -->
+    </tbody>
+  </table>
+
+  <script>
+    const translations = {
+      normal: "一般", fire: "火", water: "水", grass: "草", electric: "電", ice: "冰",
+      fighting: "格鬥", poison: "毒", ground: "地面", flying: "飛行", psychic: "超能力",
+      bug: "蟲", rock: "岩石", ghost: "幽靈", dragon: "龍", dark: "惡", steel: "鋼", fairy: "妖精"
+    };
+  
+    const typeEffectiveness = {
+      "一般": { 克制: [], 被剋: ["格鬥"], 無效: ["幽靈"] },
+      "火": { 克制: ["草", "冰", "蟲", "鋼"], 被剋: ["水", "地面", "岩石"], 無效: [] },
+      "水": { 克制: ["火", "地面", "岩石"], 被剋: ["電", "草"], 無效: [] },
+      "草": { 克制: ["水", "地面", "岩石"], 被剋: ["火", "冰", "毒", "飛行", "蟲"], 無效: [] },
+      "電": { 克制: ["水", "飛行"], 被剋: ["地面"], 無效: ["地面"] },
+      "冰": { 克制: ["草", "地面", "飛行", "龍"], 被剋: ["火", "格鬥", "岩石", "鋼"], 無效: [] },
+      "格鬥": { 克制: ["一般", "冰", "岩石", "鋼", "惡"], 被剋: ["飛行", "超能力", "妖精"], 無效: [] },
+      "毒": { 克制: ["草", "妖精"], 被剋: ["地面", "超能力"], 無效: [] },
+      "地面": { 克制: ["火", "電", "毒", "岩石", "鋼"], 被剋: ["水", "冰", "草"], 無效: ["電"] },
+      "飛行": { 克制: ["草", "格鬥", "蟲"], 被剋: ["電", "冰", "岩石"], 無效: ["地面"] },
+      "超能力": { 克制: ["格鬥", "毒"], 被剋: ["蟲", "幽靈", "惡"], 無效: [] },
+      "蟲": { 克制: ["草", "超能力", "惡"], 被剋: ["火", "飛行", "岩石"], 無效: [] },
+      "岩石": { 克制: ["火", "冰", "飛行", "蟲"], 被剋: ["水", "草", "格鬥", "地面", "鋼"], 無效: [] },
+      "幽靈": { 克制: ["幽靈", "超能力"], 被剋: ["幽靈", "惡"], 無效: ["一般"] },
+      "龍": { 克制: ["龍"], 被剋: ["冰", "龍", "妖精"], 無效: [] },
+      "惡": { 克制: ["超能力", "幽靈"], 被剋: ["格鬥", "蟲", "妖精"], 無效: [] },
+      "鋼": { 克制: ["岩石", "冰", "妖精"], 被剋: ["火", "格鬥", "地面"], 無效: ["毒"] },
+      "妖精": { 克制: ["格鬥", "龍", "惡"], 被剋: ["毒", "鋼"], 無效: ["龍"] }
+    };
+  
+    let allPokemon = [];
+  
+    // Fetch data
+    async function fetchPokemonData() {
+      for (let i = 1; i <= 1010; i++) { // 遍歷所有世代
+        const pokemonResponse = await fetch(`https://pokeapi.co/api/v2/pokemon/${i}`);
+        const pokemonData = await pokemonResponse.json();
+        const types = pokemonData.types.map(t => translations[t.type.name] || t.type.name);
+  
+        // Fetch species data to get the generation
+        const speciesResponse = await fetch(pokemonData.species.url);
+        const speciesData = await speciesResponse.json();
+        const generation = speciesData.generation.name;
+  
+        allPokemon.push({
+          id: pokemonData.id,
+          name: pokemonData.name,
+          generation: generation, // 存入世代資訊
+          types: types.join(" / "),
+          克制: calculateEffectiveness(types, "克制"),
+          被剋: calculateEffectiveness(types, "被剋")
+        });
+      }
+      renderTable(allPokemon);
+    }
+  
+    function calculateEffectiveness(types, key) {
+      const result = new Set();
+      types.forEach(type => {
+        const effectiveness = typeEffectiveness[type] || {};
+        (effectiveness[key] || []).forEach(e => result.add(e));
+      });
+      return Array.from(result).join(" / ");
+    }
+  
+    function renderTable(data) {
+      const tableBody = document.querySelector('#pokemon-table tbody');
+      tableBody.innerHTML = data.map(pokemon => `
+        <tr>
+          <td>${pokemon.id}</td>
+          <td>${pokemon.name}</td>
+          <td>${pokemon.generation}</td>
+          <td>${pokemon.types}</td>
+          <td>${pokemon.克制}</td>
+          <td>${pokemon.被剋}</td>
+        </tr>
+      `).join('');
+    }
+  
+    // Sorting function
+    function sortTable(column) {
+      const header = document.querySelector(`[data-column="${column}"]`);
+      const order = header.dataset.order === 'asc' ? 'desc' : 'asc';
+      header.dataset.order = order;
+  
+      allPokemon.sort((a, b) => {
+        if (a[column] < b[column]) return order === 'asc' ? -1 : 1;
+        if (a[column] > b[column]) return order === 'asc' ? 1 : -1;
+        return 0;
+      });
+      renderTable(allPokemon);
+      document.querySelectorAll('th').forEach(th => th.classList.remove('asc', 'desc'));
+      header.classList.add(order);
+    }
+  
+    document.addEventListener('DOMContentLoaded', () => {
+      fetchPokemonData();
+      document.querySelectorAll('th[data-column]').forEach(th => {
+        th.addEventListener('click', () => sortTable(th.dataset.column));
+      });
+      document.querySelector('#search-input').addEventListener('input', (e) => {
+        const value = e.target.value.toLowerCase();
+        const filtered = allPokemon.filter(p => 
+          p.name.toLowerCase().includes(value) || String(p.id).includes(value)
+        );
+        renderTable(filtered);
+      });
+    });
+  </script>
+  
+</body>
+</html>
